@@ -1,5 +1,5 @@
 import { querySudo as query, updateSudo as update } from '@lblod/mu-auth-sudo';
-import { sparqlEscapeUri, sparqlEscapeString, sparqlEscapeDateTime } from 'mu';
+import { sparqlEscapeUri, sparqlEscapeDateTime } from 'mu';
 
 const SPARQL_PREFIXES = `
   PREFIX mandaat: <http://data.vlaanderen.be/ns/mandaat#>
@@ -13,7 +13,6 @@ const SPARQL_PREFIXES = `
 
 const RECOGNITION_NOT_GRANTED = 'http://lblod.data.gift/concepts/343a00884d012cee6915bc7559cd69ef';
 const RECOGNITION_GRANTED_TYPE = 'http://lblod.data.gift/concepts/3dd7550843eaf18e1fa1ca6c6c3f2610';
-const WORSHIP_SERVICE_GRAPH = 'http://mu.semte.ch/graphs/worship-service';
 const PUBLIC_GRAPH = 'http://mu.semte.ch/graphs/public';
 
 class WorshipServiceRepository {

@@ -49,7 +49,6 @@ class DeltaService {
      */
     static async handleWorshipServiceErkenningChangeEvent(changeEventUri) {
         console.log(`  ✓ Worship service erkenning change event detected`);
-        // Get the worship service from the change event
         const worshipServiceUri = await WorshipServiceRepository.getWorshipServiceFromChangeEvent(changeEventUri);
         if (!worshipServiceUri) {
             console.log(`  ✗ Could not find worship service for change event`);
@@ -57,7 +56,6 @@ class DeltaService {
         }
         console.log(`  ✓ Found worship service: ${worshipServiceUri}`);
 
-        // Get mandatarissen linked to the worship service
         const mandatarissen = await WorshipServiceRepository.getMandatarissenForWorshipService(worshipServiceUri);
         if (mandatarissen.length === 0) {
             console.log(`  → No mandatarissen found for worship service (nothing to update)`);
@@ -65,32 +63,11 @@ class DeltaService {
         }
         console.log(`  ✓ Found ${mandatarissen.length} mandataris(sen)`);
 
-        // Set today as the enddate for all these mandatarissen
         const today = new Date();
         const mandatarisUris = mandatarissen.map(m => m.uri);
         await WorshipServiceRepository.setEndDatesOnMandatarissen(mandatarisUris, today);
         console.log(`  ✓ Successfully set end date on ${mandatarisUris.length} mandataris(sen)`);
     }
-
-    /**
-     * Example handler structure for future change event types
-     *
-     * static async handleOtherTypeOfChangeEvent(changeEventUri) {
-     *     // Check if this handler applies to this change event
-     *     const isRelevant = await SomeRepository.isOtherTypeOfChangeEvent(changeEventUri);
-     *     if (!isRelevant) {
-     *         return false;
-     *     }
-     *
-     *     console.log(`  ✓ Other type of change event detected`);
-     *
-     *     // Process the change event
-     *     // ... your logic here ...
-     *
-     *     return true;
-     * }
-     */
-
 }
 
 export default DeltaService;
