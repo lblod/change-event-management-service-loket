@@ -18,12 +18,6 @@ class DeltaService {
             try {
                 console.log(`\nProcessing change event: ${changeEventUri}`);
 
-                const isNewest = await WorshipServiceRepository.isNewestChangeEvent(changeEventUri);
-                if (!isNewest) {
-                    console.log(`Not the newest change event - skipping`);
-                    continue;
-                }
-
                 if (await WorshipServiceRepository.isWorshipServiceErkenningChangeEvent(changeEventUri)) {
                     await this.handleWorshipServiceErkenningChangeEvent(changeEventUri);
                 }
@@ -49,23 +43,30 @@ class DeltaService {
      */
     static async handleWorshipServiceErkenningChangeEvent(changeEventUri) {
         console.log(`  ✓ Worship service erkenning change event detected`);
-        const worshipServiceUri = await WorshipServiceRepository.getWorshipServiceFromChangeEvent(changeEventUri);
-        if (!worshipServiceUri) {
+        const changeEvent = await WorshipServiceRepository.getWorshipServiceFromChangeEvent(changeEventUri);
+        if (!changeEvent) {
             console.log(`  ✗ Could not find worship service for change event`);
             return;
         }
+        const worshipServiceUri = changeEvent.uri;
         console.log(`  ✓ Found worship service: ${worshipServiceUri}`);
 
-        const mandatarissen = await WorshipServiceRepository.getMandatarissenForWorshipService(worshipServiceUri);
+        const eventDate = changeEvent.date ? new Date(changeEvent.date) : new Date();
+        const mandatarissen = await WorshipServiceRepository.getMandatarissenForWorshipService(worshipServiceUri, eventDate);
         if (mandatarissen.length === 0) {
             console.log(`  → No mandatarissen found for worship service (nothing to update)`);
             return;
         }
         console.log(`  ✓ Found ${mandatarissen.length} mandataris(sen)`);
 
-        const today = new Date();
-        const mandatarisUris = mandatarissen.map(m => m.uri);
-        await WorshipServiceRepository.setEndDatesOnMandatarissen(mandatarisUris, today);
+        const openMandatarissen = mandatarissen.filter(m => !m.endDate);
+        if (openMandatarissen.length === 0) {
+            console.log(`  → All mandatarissen already have an end date (nothing to update)`);
+            return;
+        }
+
+        const mandatarisUris = openMandatarissen.map(m => m.uri);
+        await WorshipServiceRepository.setEndDatesOnMandatarissen(mandatarisUris, eventDate);
         console.log(`  ✓ Successfully set end date on ${mandatarisUris.length} mandataris(sen)`);
     }
 }

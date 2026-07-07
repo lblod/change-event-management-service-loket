@@ -1,10 +1,15 @@
 import { app, errorHandler } from "mu";
 import bodyParser from 'body-parser';
+import { CronJob } from 'cron';
 import Delta from "./src/model/delta.js";
 import DeltaService from "./src/service/delta-service.js";
+import HealingService from "./src/service/healing-service.js";
 
 import {
-  DEBUG
+  DEBUG,
+  MAX_BODY_SIZE,
+  HEALING_ENABLED,
+  HEALING_CRON_PATTERN
 } from './env.js';
 
 console.log('change-event-management-service-loket starting...');
@@ -12,8 +17,19 @@ if (DEBUG) {
   console.log('Debug mode enabled');
 }
 
-app.use(bodyParser.json());
-app.use(errorHandler);
+if (HEALING_ENABLED) {
+  console.log(`Healing cron enabled with pattern "${HEALING_CRON_PATTERN}"`);
+  new CronJob(HEALING_CRON_PATTERN, async () => {
+    try {
+      await HealingService.runHealing();
+    } catch (error) {
+      console.error('Error during healing run:', error);
+      console.error(error.stack);
+    }
+  }, null, true);
+}
+
+app.use(bodyParser.json({ limit: MAX_BODY_SIZE }));
 
 app.get("/", function (req, res) {
   res.send("Hello from change-event-management-service-loket!");
@@ -84,5 +100,24 @@ app.post('/manual-process', async (req, res) => {
   }
 });
 
+
+/**
+ * Healing endpoint
+ * Manually trigger the healing run that reprocesses all erkenning change events.
+ * The same logic runs on the healing cron schedule.
+ */
+app.post('/healing', (req, res) => {
+  if (HealingService.isRunning) {
+    return res.status(409).json({ message: 'Healing already in progress' });
+  }
+
+  HealingService.runHealing()
+    .catch(error => {
+      console.error('Error during healing run:', error);
+      console.error(error.stack);
+    });
+
+  return res.status(202).json({ message: 'Healing started' });
+});
 
 app.use(errorHandler);

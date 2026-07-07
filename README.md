@@ -9,12 +9,16 @@ This service provides an **extensible framework** for handling different types o
 
 1. The service listens for delta notifications from [delta-notifier](https://github.com/mu-semtech/delta-notifier)
 2. When a new `org:ChangeEvent` is created in the public graph, it gets extracted and processed
-3. The service checks if it's the newest change event for that organization (older events are skipped)
-4. The change event is routed through different handler functions based on its type
-5. **Currently implemented**: Worship service erkenning change events (status changes from "in oprichting" to "erkend" or "niet erkend"):
-   - Finds all mandatarissen associated with the worship service
-   - Sets the current date as the end date (`mandaat:einde`) for those mandatarissen
+3. The change event is routed through different handler functions based on its type
+4. **Currently implemented**: Worship service erkenning change events (status changes from "in oprichting" to "erkend" or "niet erkend"):
+   - Finds the mandatarissen of the bestuursorganen-in-tijd that were active on the change event's date (`dc:terms date`)
+   - Sets the change event's date as the end date (`mandaat:einde`) on mandatarissen that don't have one yet — existing end dates are never overwritten
    - Excludes mandatarissen with `prov:wasAssociatedWith` predicate (external data)
+
+
+### Healing
+
+A weekly cron job (Saturday 03:00 by default, see `HEALING_CRON_PATTERN`) reprocesses **all** erkenning change events, oldest first. A healing run can also be triggered manually via `POST /healing`.
 
 The architecture is designed to support multiple change event handlers, allowing you to add new business logic without modifying existing functionality.
 
@@ -22,7 +26,7 @@ The architecture is designed to support multiple change event handlers, allowing
 
 ### Current Implementation: Worship Service Erkenning
 
-When a worship service (eredienst) transitions from "in oprichting" to an officially recognized or rejected status, all existing mandatarissen need to be terminated. This service automates that process by setting end dates on those mandatarissen.
+When a worship service (eredienst) transitions from "in oprichting" to an officially recognized or rejected status, the mandatarissen of the bestuursorgaan active at that moment need to be terminated. This service automates that process by setting end dates on those mandatarissen.
 
 ## Installation
 
@@ -31,7 +35,7 @@ When a worship service (eredienst) transitions from "in oprichting" to an offici
 Add the service to your `docker-compose.yml`:
 
 ```yaml
-  change-event-management-service-loket:
+  change-event-management-loket:
     image: lblod/change-event-management-service-loket
     environment:
       DEBUG: "false"
@@ -61,13 +65,13 @@ Add a rule to your `config/delta/rules.js` to trigger on new change events:
     }
   },
   callback: {
-    url: 'http://change-event-management-service-loket/delta',
+    url: 'http://change-event-management-loket/delta',
     method: 'POST'
   },
   options: {
     resourceFormat: 'v0.0.1',
     gracePeriod: 1000,
-    ignoreFromSelf: false
+    ignoreFromSelf: true
   }
 }
 ```
@@ -76,9 +80,12 @@ Add a rule to your `config/delta/rules.js` to trigger on new change events:
 
 ### Environment Variables
 
-| Variable             | Required | Default                       | Description                    |
-|----------------------|----------|-------------------------------|--------------------------------|
-| `DEBUG`              | No       | `false`                       | Enable debug logging           |
+| Variable               | Required | Default       | Description                                          |
+|------------------------|----------|---------------|------------------------------------------------------|
+| `DEBUG`                | No       | `false`       | Enable debug logging                                 |
+| `MAX_BODY_SIZE`        | No       | `50mb`        | Maximum accepted request body size (delta payloads)  |
+| `HEALING_ENABLED`      | No       | `true`        | Enable the weekly healing cron job                   |
+| `HEALING_CRON_PATTERN` | No       | `0 0 3 * * 6` | Cron pattern for the healing job (Saturday 03:00)    |
 
 ## API
 
@@ -105,6 +112,30 @@ Receives delta notifications for new `org:ChangeEvent` resources.
 - Extracts new `org:ChangeEvent` URIs from the public graph
 - Processes change events asynchronously
 - For each change event:
-  - Verifies it's the newest change event for that organization
   - Checks if it's a worship service erkenning change event
-  - Sets end dates on associated mandatarissen if applicable
+  - Sets the event date as end date on the open mandatarissen of the bestuursorganen-in-tijd active on that date
+
+### POST /manual-process
+
+Manually trigger processing of a single change event, e.g. for testing or healing a missed event.
+
+**Request Body**:
+
+```json
+{ "changeEventUri": "http://example.org/change-event/123" }
+```
+
+**Response**:
+
+- `200 OK` - Change event processed
+- `400 Bad Request` - Missing `changeEventUri`
+- `500 Internal Server Error` - Processing failed
+
+### POST /healing
+
+Manually trigger a healing run: reprocesses all erkenning change events, oldest first. Runs asynchronously; the same logic runs on the healing cron schedule.
+
+**Response**:
+
+- `202 Accepted` - Healing started
+- `409 Conflict` - A healing run is already in progress
