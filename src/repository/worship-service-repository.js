@@ -17,17 +17,26 @@ const RECOGNITION_NOT_GRANTED = 'http://lblod.data.gift/concepts/343a00884d012ce
 const RECOGNITION_GRANTED_TYPE = 'http://lblod.data.gift/concepts/3dd7550843eaf18e1fa1ca6c6c3f2610';
 const PUBLIC_GRAPH = 'http://mu.semte.ch/graphs/public';
 
+
+const IN_OPRICHTING_ROLES = [
+  'http://data.vlaanderen.be/id/concept/BestuursfunctieCode/67e6e585166cd97575b3e17ffc430a43',
+  'http://data.vlaanderen.be/id/concept/BestuursfunctieCode/5ac134b9800b81da3c450d6b9605cef2',
+  'http://data.vlaanderen.be/id/concept/BestuursfunctieCode/180d13930d6f1a3938e0aa7fa9990002',
+];
+
 class WorshipServiceRepository {
 
   /**
-   * Get all mandatarissen for a worship service, limited to the
-   * bestuursorganen-in-tijd whose period covers the given reference date.
-   * The start bound is strict: a period starting exactly on the reference
-   * date is the successor created by the change event itself, and its
-   * mandatarissen must not be ended.
+   * Get the mandatarissen affected by an "in oprichting" transition on the
+   * given reference date (the change event date). Only targets the
+   * bestuursorgaan-in-tijd that the transition itself closed, i.e. with
+   * bindingEinde equal to the change event date.
    * Excludes mandatarissen with prov:wasAssociatedWith predicate
    */
   static async getMandatarissenForWorshipService(worshipServiceUri, referenceDate) {
+    const rolesNotInFilter = IN_OPRICHTING_ROLES
+      .map(role => `?otherRole != ${sparqlEscapeUri(role)}`)
+      .join(' && ');
     const queryStr = `
       ${SPARQL_PREFIXES}
       SELECT DISTINCT ?mandataris ?endDate WHERE {
@@ -36,11 +45,14 @@ class WorshipServiceRepository {
           ?bestuursorgaan besluit:bestuurt ${sparqlEscapeUri(worshipServiceUri)} .
           ?orgaanInTime generiek:isTijdspecialisatieVan ?bestuursorgaan .
           ?orgaanInTime org:hasPost ?mandaat .
+          ?orgaanInTime mandaat:bindingEinde ?bindingEinde .
+          FILTER(?bindingEinde = ${sparqlEscapeDateTime(referenceDate)})
 
-          OPTIONAL { ?orgaanInTime mandaat:bindingStart ?bindingStart . }
-          OPTIONAL { ?orgaanInTime mandaat:bindingEinde ?bindingEinde . }
-          FILTER(!BOUND(?bindingStart) || ?bindingStart < ${sparqlEscapeDateTime(referenceDate)})
-          FILTER(!BOUND(?bindingEinde) || ?bindingEinde >= ${sparqlEscapeDateTime(referenceDate)})
+          FILTER NOT EXISTS {
+            ?orgaanInTime org:hasPost ?otherMandaat .
+            ?otherMandaat org:role ?otherRole .
+            FILTER(${rolesNotInFilter})
+          }
         }
 
         GRAPH ?orgGraph {

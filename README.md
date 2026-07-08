@@ -11,7 +11,7 @@ This service provides an **extensible framework** for handling different types o
 2. When a new `org:ChangeEvent` is created in the public graph, it gets extracted and processed
 3. The change event is routed through different handler functions based on its type
 4. **Currently implemented**: Worship service erkenning change events (status changes from "in oprichting" to "erkend" or "niet erkend"):
-   - Finds the mandatarissen of the bestuursorganen-in-tijd that were active on the change event's date (`dc:terms date`)
+   - Finds the mandatarissen of the bestuursorgaan-in-tijd that was closed by the transition, i.e. whose `mandaat:bindingEinde` equals the change event's date (`dcterms:date`).
    - Sets the change event's date as the end date (`mandaat:einde`) on mandatarissen that don't have one yet — existing end dates are never overwritten
    - Excludes mandatarissen with `prov:wasAssociatedWith` predicate (external data)
 
@@ -113,7 +113,7 @@ Receives delta notifications for new `org:ChangeEvent` resources.
 - Processes change events asynchronously
 - For each change event:
   - Checks if it's a worship service erkenning change event
-  - Sets the event date as end date on the open mandatarissen of the bestuursorganen-in-tijd active on that date
+  - Sets the event date as end date on the open mandatarissen of the bestuursorgaan-in-tijd that was closed on that date by the transition; a no-op when that closing has not synced from OP yet (healing catches up)
 
 ### POST /manual-process
 

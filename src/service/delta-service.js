@@ -51,7 +51,11 @@ class DeltaService {
         const worshipServiceUri = changeEvent.uri;
         console.log(`  ✓ Found worship service: ${worshipServiceUri}`);
 
-        const eventDate = changeEvent.date ? new Date(changeEvent.date) : new Date();
+        if (!changeEvent.date) {
+            console.log(`  ✗ Change event has no dct:date, skipping`);
+            return;
+        }
+        const eventDate = new Date(changeEvent.date);
         const mandatarissen = await WorshipServiceRepository.getMandatarissenForWorshipService(worshipServiceUri, eventDate);
         if (mandatarissen.length === 0) {
             console.log(`  → No mandatarissen found for worship service (nothing to update)`);

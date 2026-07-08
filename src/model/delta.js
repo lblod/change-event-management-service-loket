@@ -20,13 +20,14 @@ class Delta {
      * Get all new ChangeEvent URIs inserted in the public graph
      */
     getNewChangeEvents() {
-        return this.inserts
+        const uris = this.inserts
             .filter(t =>
                 t.predicate.value === RDF_TYPE &&
                 t.object.value === ORG_CHANGE_EVENT &&
                 t.graph.value === PUBLIC_GRAPH
             )
             .map(t => t.subject.value);
+        return [...new Set(uris)];
     }
 }
 
