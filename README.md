@@ -1,7 +1,7 @@
 # Change Event Management Service Loket
 
 Microservice to update loket data based on incoming OP (Organisatieportaal) change-events.
-Designed for the [semantic.works](https://semantic.works/) microservices stack.
+Designed for the [semantic.works](https://semantic.works/) microservices stack. 
 
 This service provides an **extensible framework** for handling different types of organization change events. Currently, it manages mandataris end dates when worship services undergo status changes related to their official recognition (erkenning), but it can be easily extended to handle other change event types and business logic.
 
